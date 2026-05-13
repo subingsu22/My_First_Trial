@@ -62,8 +62,10 @@ let timerId = null;
 let sessionEndTime = null;
 let sessionTimerId = null;
 let completedAnswers = 0;
+let isPracticeReady = false;
 let isPracticeFinished = false;
 let recognition = null;
+let recognitionSessionId = 0;
 let finalTranscript = "";
 let interimTranscript = "";
 
@@ -153,15 +155,23 @@ startPracticeButton.addEventListener("click", () => {
 
   practiceQueue = shuffleQuestions(questions);
   completedAnswers = 0;
+  isPracticeReady = true;
   isPracticeFinished = false;
+  currentPracticeQuestion = null;
   answerLog.innerHTML = "";
   logEmptyMessage.classList.remove("hidden");
-  startSessionTimer(getSelectedPracticeTime());
   showPage(practicePage);
-  showNextQuestion();
+  showPracticeReadyScreen();
 });
 
-completeButton.addEventListener("click", () => {
+completeButton.addEventListener("click", async () => {
+  if (isPracticeReady) {
+    isPracticeReady = false;
+    startSessionTimer(getSelectedPracticeTime());
+    showNextQuestion();
+    return;
+  }
+
   if (isPracticeFinished) {
     stopAllTimers();
     showPage(mainPage);
@@ -169,10 +179,12 @@ completeButton.addEventListener("click", () => {
     return;
   }
 
+  completeButton.disabled = true;
   const seconds = getElapsedSeconds();
-  const transcript = getCurrentTranscript();
-  stopSpeechRecognition();
-  addAnswerLog(currentPracticeQuestion, seconds, transcript);
+  const answeredQuestion = currentPracticeQuestion;
+  stopTimer();
+  const transcript = await stopSpeechRecognitionAndGetTranscript();
+  addAnswerLog(answeredQuestion, seconds, transcript);
   completedAnswers += 1;
   showNextQuestion();
 });
@@ -180,6 +192,7 @@ completeButton.addEventListener("click", () => {
 exitButton.addEventListener("click", () => {
   stopSpeechRecognition();
   stopAllTimers();
+  isPracticeReady = false;
   showPage(mainPage);
 });
 
@@ -631,6 +644,19 @@ function showPage(page) {
   page.classList.add("page-active");
 }
 
+function showPracticeReadyScreen() {
+  stopAllTimers();
+  stopSpeechRecognition();
+  currentPracticeQuestion = null;
+  renderCurrentCategory("");
+  progressText.textContent = `0 / ${questions.length}`;
+  selectedTimeText.textContent = getSelectedPracticeTimeLabel();
+  currentQuestion.textContent = "준비가 되면 시작하기를 눌러주세요.";
+  answerTimer.textContent = "00:00";
+  completeButton.disabled = false;
+  completeButton.textContent = "시작하기";
+}
+
 function showNextQuestion() {
   if (practiceQueue.length === 0) {
     finishPractice("모든 질문을 연습했어요. 수고했어요!");
@@ -656,7 +682,9 @@ function showNextQuestion() {
 function finishPractice(message) {
   stopAllTimers();
   stopSpeechRecognition();
+  isPracticeReady = false;
   isPracticeFinished = true;
+  currentPracticeQuestion = null;
   currentQuestion.textContent = message;
   renderCurrentCategory("");
   progressText.textContent = `${completedAnswers} / ${questions.length}`;
@@ -719,12 +747,16 @@ function startSpeechRecognition() {
     return;
   }
 
+  recognitionSessionId += 1;
+  const sessionId = recognitionSessionId;
   recognition = new SpeechRecognition();
   recognition.lang = "ko-KR";
   recognition.continuous = true;
   recognition.interimResults = true;
 
   recognition.onresult = (event) => {
+    if (sessionId !== recognitionSessionId) return;
+
     interimTranscript = "";
 
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
@@ -740,11 +772,12 @@ function startSpeechRecognition() {
   };
 
   recognition.onerror = () => {
+    if (sessionId !== recognitionSessionId) return;
     stopSpeechRecognition();
   };
 
   recognition.onend = () => {
-    if (!recognition || isPracticeFinished || !currentPracticeQuestion) return;
+    if (sessionId !== recognitionSessionId || !recognition || isPracticeFinished || !currentPracticeQuestion) return;
 
     try {
       recognition.start();
@@ -763,6 +796,7 @@ function startSpeechRecognition() {
 function stopSpeechRecognition() {
   if (!recognition) return;
 
+  recognitionSessionId += 1;
   recognition.onend = null;
   try {
     recognition.stop();
@@ -770,6 +804,48 @@ function stopSpeechRecognition() {
     // 이미 멈춘 경우에는 저장 흐름만 이어가면 됩니다.
   }
   recognition = null;
+}
+
+function stopSpeechRecognitionAndGetTranscript() {
+  if (!recognition) {
+    return Promise.resolve(getCurrentTranscript());
+  }
+
+  const activeRecognition = recognition;
+  const sessionId = recognitionSessionId;
+
+  return new Promise((resolve) => {
+    let didFinish = false;
+
+    const finish = () => {
+      if (didFinish) return;
+      didFinish = true;
+
+      if (sessionId === recognitionSessionId) {
+        recognitionSessionId += 1;
+      }
+
+      if (recognition === activeRecognition) {
+        recognition = null;
+      }
+
+      resolve(getCurrentTranscript());
+    };
+
+    const fallbackId = window.setTimeout(finish, 900);
+
+    activeRecognition.onend = () => {
+      window.clearTimeout(fallbackId);
+      window.setTimeout(finish, 120);
+    };
+
+    try {
+      activeRecognition.stop();
+    } catch (error) {
+      window.clearTimeout(fallbackId);
+      finish();
+    }
+  });
 }
 
 function resetTranscript() {
@@ -797,15 +873,12 @@ function addAnswerLog(question, seconds, transcript) {
   const item = document.createElement("li");
   const text = document.createElement("p");
   const time = document.createElement("span");
-  const transcriptText = document.createElement("p");
 
   item.className = "answer-log-item";
   text.className = "answer-log-question";
   text.textContent = question.text;
   time.className = "answer-log-time";
   time.textContent = formatSeconds(seconds);
-  transcriptText.className = "transcript-text";
-  transcriptText.textContent = transcript || "인식된 답변 텍스트가 없어요.";
 
   if (question.category) {
     const chip = document.createElement("span");
@@ -814,7 +887,7 @@ function addAnswerLog(question, seconds, transcript) {
     item.appendChild(chip);
   }
 
-  item.append(text, time, transcriptText);
+  item.append(text, time);
   answerLog.appendChild(item);
   logEmptyMessage.classList.add("hidden");
 
@@ -964,6 +1037,11 @@ function shuffleQuestions(questionItems) {
 function getSelectedPracticeTime() {
   const selected = document.querySelector("input[name='practiceTime']:checked");
   return selected ? selected.value : "unlimited";
+}
+
+function getSelectedPracticeTimeLabel() {
+  const selectedTime = getSelectedPracticeTime();
+  return selectedTime === "unlimited" ? "무제한 연습" : `${selectedTime}분 연습`;
 }
 
 function formatSeconds(totalSeconds) {

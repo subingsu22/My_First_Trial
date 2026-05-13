@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>면접 연습 MVP</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section id="mainPage" class="page page-active" aria-labelledby="mainTitle">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Interview Practice</p>
+            <h1 id="mainTitle">면접 질문을 모으고 바로 연습해요</h1>
+          </div>
+        </header>
+
+        <nav class="main-tabs" aria-label="메인 탭">
+          <button id="practiceTabButton" class="tab-button tab-button-active" type="button">면접 연습</button>
+          <button id="recordsTabButton" class="tab-button" type="button">기록</button>
+        </nav>
+
+        <div id="setupTabContent">
+          <section class="panel question-panel" aria-labelledby="addQuestionTitle">
+            <div class="section-heading">
+              <div class="title-actions">
+                <h2 id="addQuestionTitle">면접 질문</h2>
+                <button id="showBulkButton" class="text-button" type="button">질문 여러 개 추가하기</button>
+              </div>
+              <button id="showInputButton" class="icon-button" type="button" aria-label="질문 입력란 열기">+</button>
+            </div>
+
+            <form id="questionForm" class="question-form hidden">
+              <label class="visually-hidden" for="questionInput">면접 질문 입력</label>
+              <input id="questionInput" type="text" placeholder="예: 본인의 강점은 무엇인가요?" autocomplete="off" />
+              <div class="category-picker" id="singleCategoryPicker">
+                <button id="categoryMenuButton" class="category-menu-button" type="button" aria-expanded="false">
+                  카테고리 없음
+                </button>
+                <div id="categoryMenu" class="category-menu hidden">
+                  <div id="categoryOptions" class="category-options"></div>
+                  <div class="category-menu-add">
+                    <label class="visually-hidden" for="categoryInput">새 카테고리 입력</label>
+                    <input id="categoryInput" type="text" placeholder="새 카테고리" autocomplete="off" />
+                    <button id="addCategoryButton" class="secondary-button" type="button">추가</button>
+                  </div>
+                </div>
+              </div>
+              <button class="primary-button" type="submit">질문 추가</button>
+            </form>
+
+            <section id="bulkPanel" class="bulk-panel hidden" aria-label="질문 여러 개 추가하기">
+              <textarea id="bulkInput" rows="5" placeholder="질문을 한 줄에 하나씩 입력하세요."></textarea>
+              <div class="bulk-actions">
+                <button id="splitBulkButton" class="secondary-button" type="button">질문 구분하기</button>
+                <button id="addBulkButton" class="primary-button" type="button">모두 추가</button>
+              </div>
+              <div id="bulkPreview" class="bulk-preview"></div>
+              <p id="bulkHint" class="hint">줄바꿈으로 질문을 구분한 뒤, 각 질문의 카테고리를 선택할 수 있어요.</p>
+            </section>
+
+            <div id="categoryFilters" class="category-filters hidden" aria-label="카테고리 필터"></div>
+            <ul id="questionList" class="question-list" aria-live="polite"></ul>
+            <nav id="pagination" class="pagination hidden" aria-label="질문 리스트 페이지"></nav>
+            <p id="emptyMessage" class="empty-message">아직 추가한 질문이 없어요. + 버튼으로 첫 질문을 넣어보세요.</p>
+          </section>
+
+          <section class="panel practice-settings" aria-labelledby="practiceSettingsTitle">
+            <h2 id="practiceSettingsTitle">면접 연습</h2>
+            <div class="time-options" role="radiogroup" aria-label="면접 연습 시간 선택">
+              <label>
+                <input type="radio" name="practiceTime" value="unlimited" checked />
+                <span>무제한</span>
+              </label>
+              <label>
+                <input type="radio" name="practiceTime" value="15" />
+                <span>15분</span>
+              </label>
+              <label>
+                <input type="radio" name="practiceTime" value="30" />
+                <span>30분</span>
+              </label>
+            </div>
+            <button id="startPracticeButton" class="primary-button wide-button" type="button">면접 연습</button>
+            <p id="startHint" class="hint">질문을 1개 이상 추가하면 연습을 시작할 수 있어요.</p>
+          </section>
+        </div>
+
+        <section id="recordsTabContent" class="panel records-panel hidden" aria-labelledby="recordsTitle">
+          <h2 id="recordsTitle">기록</h2>
+          <section class="calendar-card" aria-label="연습 기록 날짜 선택">
+            <div class="calendar-header">
+              <button id="prevMonthButton" class="calendar-nav-button" type="button" aria-label="이전 달">‹</button>
+              <strong id="calendarTitle"></strong>
+              <button id="nextMonthButton" class="calendar-nav-button" type="button" aria-label="다음 달">›</button>
+            </div>
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span>일</span>
+              <span>월</span>
+              <span>화</span>
+              <span>수</span>
+              <span>목</span>
+              <span>금</span>
+              <span>토</span>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+          </section>
+          <p id="selectedDateLabel" class="selected-date-label"></p>
+          <ul id="recordsList" class="records-list"></ul>
+          <p id="recordsEmptyMessage" class="empty-message">아직 저장된 연습 기록이 없어요.</p>
+        </section>
+      </section>
+
+      <section id="practicePage" class="page" aria-labelledby="practiceTitle">
+        <header class="practice-header">
+          <div>
+            <p class="eyebrow">Practice Mode</p>
+            <h1 id="practiceTitle">질문에 답변해보세요</h1>
+          </div>
+          <button id="exitButton" class="ghost-button" type="button">끝내기</button>
+        </header>
+
+        <section class="panel practice-card" aria-live="polite">
+          <div class="practice-meta">
+            <span id="progressText">1 / 1</span>
+            <span id="selectedTimeText">남은 시간 15:00</span>
+          </div>
+          <p id="currentCategory" class="practice-category hidden"></p>
+          <p id="currentQuestion" class="current-question"></p>
+          <div class="timer-box">
+            <span>이번 답변 시간</span>
+            <strong id="answerTimer">00:00</strong>
+          </div>
+          <button id="completeButton" class="primary-button wide-button" type="button">답변 완료</button>
+        </section>
+
+        <section class="panel result-panel">
+          <h2>답변 기록</h2>
+          <ul id="answerLog" class="answer-log"></ul>
+          <p id="logEmptyMessage" class="empty-message">아직 완료한 답변이 없어요.</p>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
